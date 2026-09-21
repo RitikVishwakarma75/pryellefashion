@@ -128,7 +128,7 @@ export function shopifyProductToProduct(sp: NormalizedShopifyProduct): Product {
   }
 
   return {
-    id: sp.id,
+    id: sp.handle,
     name: sp.title,
     subtitle: sp.vendor ? `${sp.vendor} • Haute Hairwear` : 'PRAYELE Haute Hairwear',
     megaCategory,

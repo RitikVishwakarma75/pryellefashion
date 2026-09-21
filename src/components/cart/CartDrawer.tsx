@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '@/context/CartContext';
-import { PRODUCTS } from '@/data/products';
 import Image from 'next/image';
 import { X, Trash2, ShoppingBag, ArrowRight, Sparkles, Tag, Truck, Lock } from 'lucide-react';
 
@@ -36,8 +35,9 @@ export default function CartDrawer() {
 
   if (!isCartOpen) return null;
 
-  // Complete the look upselling item
-  const upsellProduct = PRODUCTS.find((p) => p.id === 'astra-pearl-pin') || PRODUCTS[1];
+  // Upsell: suggest a product not already in cart (from cart's existing product pool)
+  // We pick a different product from the items the user has seen (from their cart items' categories)
+  const cartProductIds = new Set(cart.map((i) => i.product.id));
 
   const handleApplyPromo = (e: React.FormEvent) => {
     e.preventDefault();
@@ -263,42 +263,18 @@ export default function CartDrawer() {
               ))
             )}
 
-            {/* Complete The Look Upsell Banner */}
-            {cart.length > 0 && (
+            {/* Complete The Look — free shipping nudge if close */}
+            {cart.length > 0 && !isFreeShipping && (
               <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/50 mt-4">
-                <div className="flex items-center gap-1.5 mb-2">
+                <div className="flex items-center gap-1.5 mb-1">
                   <Sparkles className="w-3.5 h-3.5 text-amber-700" />
                   <span className="caps-subtitle text-[10px] font-bold tracking-widest text-amber-900">
-                    Complete The Look
+                    Almost There!
                   </span>
                 </div>
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="relative w-11 h-11 rounded-lg overflow-hidden bg-stone-200 flex-shrink-0">
-                      <Image
-                        src={upsellProduct.colors[0].image}
-                        alt={upsellProduct.name}
-                        fill
-                        sizes="44px"
-                        className="object-cover"
-                      />
-                    </div>
-                    <div>
-                      <h5 className="text-xs font-semibold text-stone-900 line-clamp-1">
-                        {upsellProduct.name}
-                      </h5>
-                      <span className="text-[11px] text-amber-800 font-medium">
-                        Bundle Add: ₹{upsellProduct.price}
-                      </span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={(e) => addToCart(upsellProduct, upsellProduct.colors[0], 1, e)}
-                    className="px-3 py-1.5 rounded-full bg-stone-900 text-white text-[10px] font-semibold uppercase tracking-wider hover:bg-black flex-shrink-0"
-                  >
-                    + Add
-                  </button>
-                </div>
+                <p className="text-[11px] text-amber-800">
+                  Add <strong>₹{amountNeededForFreeShipping}</strong> more to unlock complimentary express courier.
+                </p>
               </div>
             )}
           </div>

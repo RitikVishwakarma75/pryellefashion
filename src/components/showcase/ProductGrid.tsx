@@ -3,11 +3,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { PRODUCTS } from '@/data/products';
 import { CATEGORIES } from '@/data/categories';
-import { Product, MegaCategory, SubCategory } from '@/types';
+import { Product } from '@/types';
 import { shopifyProductToProduct } from '@/lib/shopifyAdapter';
 import ProductCard from './ProductCard';
 import QuickViewModal from './QuickViewModal';
-import { Sparkles, SlidersHorizontal, ChevronDown } from 'lucide-react';
+import { Sparkles, SlidersHorizontal, ChevronDown, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function ProductGrid() {
@@ -18,14 +18,16 @@ export default function ProductGrid() {
   const [showAllProducts, setShowAllProducts] = useState(false);
   const [shopifyProducts, setShopifyProducts] = useState<Product[]>([]);
   const [isShopifyLive, setIsShopifyLive] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch real Shopify products
+  // Fetch real Shopify products — Shopify is the source of truth
   useEffect(() => {
     let isMounted = true;
     async function loadShopify() {
       try {
+        setIsLoading(true);
         const res = await fetch('/api/shopify-products?limit=50');
-        if (!res.ok) return;
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (data?.status === 'success' && Array.isArray(data.products) && data.products.length > 0) {
           const mapped = data.products.map(shopifyProductToProduct);
@@ -35,7 +37,9 @@ export default function ProductGrid() {
           }
         }
       } catch {
-        // Silently preserve catalog with fallback products
+        // Shopify unavailable — will use static fallback
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
     }
     loadShopify();
@@ -44,13 +48,12 @@ export default function ProductGrid() {
     };
   }, []);
 
-  // Prioritize live Shopify products; merge remaining curated catalog
+  // Shopify-first: use Shopify products exclusively when available.
+  // Fall back to static PRODUCTS ONLY when Shopify fetch fails entirely.
   const allProducts = useMemo(() => {
-    if (shopifyProducts.length === 0) return PRODUCTS;
-    const shopifyNames = new Set(shopifyProducts.map((p) => p.name.toLowerCase()));
-    const remaining = PRODUCTS.filter((p) => !shopifyNames.has(p.name.toLowerCase()));
-    return [...shopifyProducts, ...remaining];
-  }, [shopifyProducts]);
+    if (isShopifyLive && shopifyProducts.length > 0) return shopifyProducts;
+    return PRODUCTS;
+  }, [shopifyProducts, isShopifyLive]);
 
   // Get active mega-category config for sub-filters
   const activeMegaConfig = CATEGORIES.find((c) => c.id === activeMega);
@@ -225,21 +228,44 @@ export default function ProductGrid() {
       )}
 
       {/* Editorial Product Grid */}
-      <motion.div
-        layout
-        className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 w-full max-w-full"
-      >
-        <AnimatePresence>
-          {visibleProducts.map((product, idx) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              index={idx}
-              onQuickView={(p) => setQuickViewProduct(p)}
-            />
+      {isLoading ? (
+        <div className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 w-full max-w-full">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
+              key={i}
+              className="rounded-2xl min-[360px]:rounded-3xl p-3 min-[360px]:p-3.5 sm:p-5 glass-panel border border-white/60 bg-white/70 animate-pulse"
+            >
+              <div className="w-full aspect-[4/5] rounded-xl min-[360px]:rounded-2xl bg-stone-200/60 mb-3 sm:mb-4" />
+              <div className="space-y-2">
+                <div className="h-3 bg-stone-200/60 rounded-full w-1/3" />
+                <div className="h-5 bg-stone-200/60 rounded-full w-3/4" />
+                <div className="h-3 bg-stone-200/60 rounded-full w-full" />
+                <div className="h-3 bg-stone-200/60 rounded-full w-2/3" />
+                <div className="flex justify-between items-center pt-3 border-t border-stone-100 mt-3">
+                  <div className="h-6 bg-stone-200/60 rounded-full w-16" />
+                  <div className="h-8 bg-stone-200/60 rounded-full w-20" />
+                </div>
+              </div>
+            </div>
           ))}
-        </AnimatePresence>
-      </motion.div>
+        </div>
+      ) : (
+        <motion.div
+          layout
+          className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 w-full max-w-full"
+        >
+          <AnimatePresence>
+            {visibleProducts.map((product, idx) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                index={idx}
+                onQuickView={(p) => setQuickViewProduct(p)}
+              />
+            ))}
+          </AnimatePresence>
+        </motion.div>
+      )}
 
       {/* Load More */}
       {hasMore && (

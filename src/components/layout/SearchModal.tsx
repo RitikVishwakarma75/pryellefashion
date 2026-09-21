@@ -9,6 +9,7 @@ import { shopifyProductToProduct } from '@/lib/shopifyAdapter';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Search, X, Sparkles, Loader2, ExternalLink } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface SearchModalProps {
   isOpen: boolean;
@@ -22,6 +23,7 @@ export default function SearchModal({ isOpen, onClose, onSelectProduct }: Search
   const [shopifyResults, setShopifyResults] = useState<Product[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const { addToCart } = useCart();
+  const router = useRouter();
 
   // Debounced live search to Shopify API
   useEffect(() => {
@@ -61,7 +63,7 @@ export default function SearchModal({ isOpen, onClose, onSelectProduct }: Search
     };
   }, [query, sortBy]);
 
-  // Merge results: Shopify first, then complementary local matches
+  // Merge results: Shopify first, then complementary local matches only when needed
   const mergedResults = useMemo(() => {
     if (!query.trim()) return PRODUCTS.slice(0, 5);
 
@@ -74,12 +76,10 @@ export default function SearchModal({ isOpen, onClose, onSelectProduct }: Search
         p.subCategory.toLowerCase().includes(query.toLowerCase())
     );
 
-    if (shopifyResults.length === 0) return localMatches;
+    // If Shopify returned results, use them exclusively
+    if (shopifyResults.length > 0) return shopifyResults;
 
-    const shopifyNames = new Set(shopifyResults.map((p) => p.name.toLowerCase()));
-    const remainingLocal = localMatches.filter((p) => !shopifyNames.has(p.name.toLowerCase()));
-
-    return [...shopifyResults, ...remainingLocal];
+    return localMatches;
   }, [query, shopifyResults]);
 
   if (!isOpen) return null;
@@ -206,8 +206,8 @@ export default function SearchModal({ isOpen, onClose, onSelectProduct }: Search
                   <div
                     key={item.id}
                     onClick={() => {
-                      if (onSelectProduct) onSelectProduct(item);
                       onClose();
+                      router.push(`/products/${item.id}`);
                     }}
                     className="p-3 rounded-2xl hover:bg-stone-50 flex items-center justify-between gap-4 cursor-pointer transition-colors border border-transparent hover:border-black/5 group"
                   >
@@ -226,8 +226,8 @@ export default function SearchModal({ isOpen, onClose, onSelectProduct }: Search
                           <h4 className="editorial-serif text-base font-medium text-stone-900 group-hover:text-[var(--theme-accent)] transition-colors">
                             {item.name}
                           </h4>
-                          {item.id.startsWith('gid://') && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-stone-100 text-stone-600 font-mono">
+                        {shopifyResults.some((sr) => sr.id === item.id) && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-medium">
                               Live
                             </span>
                           )}

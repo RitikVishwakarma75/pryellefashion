@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { Product } from '@/types';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
@@ -22,6 +23,12 @@ export default function ProductCard({ product, onQuickView, index = 0 }: Product
 
   const currentColor = product.colors[selectedColorIdx] || product.colors[0];
   const isWished = isInWishlist(product.id);
+
+  // Generate PDP handle — for Shopify products, product.id is already the handle.
+  // For legacy static products, the id is a slug like 'luna-claw'.
+  const productHandle = product.id.startsWith('gid://shopify/')
+    ? product.id  // This shouldn't happen — adapter uses handle not GID
+    : product.id;
 
   return (
     <motion.div
@@ -114,12 +121,12 @@ export default function ProductCard({ product, onQuickView, index = 0 }: Product
           </div>
 
           {/* Product Name & Subtitle */}
-          <h3
-            onClick={() => onQuickView(product)}
-            className="editorial-serif text-base min-[360px]:text-lg sm:text-xl font-normal text-[var(--theme-text)] cursor-pointer hover:text-[var(--theme-accent)] transition-colors leading-snug mb-1 line-clamp-1"
+          <Link
+            href={`/products/${productHandle}`}
+            className="editorial-serif text-base min-[360px]:text-lg sm:text-xl font-normal text-[var(--theme-text)] cursor-pointer hover:text-[var(--theme-accent)] transition-colors leading-snug mb-1 line-clamp-1 block"
           >
             {product.name}
-          </h3>
+          </Link>
           <p className="text-[11px] min-[360px]:text-xs text-[var(--theme-text-muted)] line-clamp-2 leading-relaxed mb-3">
             {product.description}
           </p>
