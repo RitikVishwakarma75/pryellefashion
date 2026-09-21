@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { PRODUCTS } from '@/data/products';
 import { CATEGORIES } from '@/data/categories';
 import { Product, MegaCategory, SubCategory } from '@/types';
+import { shopifyProductToProduct } from '@/lib/shopifyAdapter';
 import ProductCard from './ProductCard';
 import QuickViewModal from './QuickViewModal';
 import { Sparkles, SlidersHorizontal, ChevronDown } from 'lucide-react';
@@ -15,6 +16,41 @@ export default function ProductGrid() {
   const [sortBy, setSortBy] = useState<'featured' | 'price-asc' | 'price-desc' | 'rating'>('featured');
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
   const [showAllProducts, setShowAllProducts] = useState(false);
+  const [shopifyProducts, setShopifyProducts] = useState<Product[]>([]);
+  const [isShopifyLive, setIsShopifyLive] = useState(false);
+
+  // Fetch real Shopify products
+  useEffect(() => {
+    let isMounted = true;
+    async function loadShopify() {
+      try {
+        const res = await fetch('/api/shopify-products?limit=50');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data?.status === 'success' && Array.isArray(data.products) && data.products.length > 0) {
+          const mapped = data.products.map(shopifyProductToProduct);
+          if (isMounted) {
+            setShopifyProducts(mapped);
+            setIsShopifyLive(true);
+          }
+        }
+      } catch {
+        // Silently preserve catalog with fallback products
+      }
+    }
+    loadShopify();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Prioritize live Shopify products; merge remaining curated catalog
+  const allProducts = useMemo(() => {
+    if (shopifyProducts.length === 0) return PRODUCTS;
+    const shopifyNames = new Set(shopifyProducts.map((p) => p.name.toLowerCase()));
+    const remaining = PRODUCTS.filter((p) => !shopifyNames.has(p.name.toLowerCase()));
+    return [...shopifyProducts, ...remaining];
+  }, [shopifyProducts]);
 
   // Get active mega-category config for sub-filters
   const activeMegaConfig = CATEGORIES.find((c) => c.id === activeMega);
@@ -22,17 +58,17 @@ export default function ProductGrid() {
   // Build mega-category tabs with product counts
   const megaTabs = useMemo(() => {
     const tabs = [
-      { id: 'all', emoji: '✨', label: 'All Creations', count: PRODUCTS.length },
+      { id: 'all', emoji: '✨', label: 'All Creations', count: allProducts.length },
     ];
     CATEGORIES.forEach((cat) => {
-      const count = PRODUCTS.filter((p) => p.megaCategory === cat.id).length;
+      const count = allProducts.filter((p) => p.megaCategory === cat.id).length;
       tabs.push({ id: cat.id, emoji: cat.emoji, label: cat.name, count });
     });
     return tabs;
-  }, []);
+  }, [allProducts]);
 
   // Filter items
-  let filtered = PRODUCTS.filter((p) => {
+  let filtered = allProducts.filter((p) => {
     if (activeMega !== 'all' && p.megaCategory !== activeMega) return false;
     if (activeSub !== 'all' && p.subCategory !== activeSub) return false;
     return true;
@@ -72,6 +108,12 @@ export default function ProductGrid() {
             <span className="caps-subtitle text-[9px] min-[360px]:text-[10px] tracking-[0.16em] sm:tracking-[0.22em] text-[var(--theme-text)]/80">
               Curated Hairwear Catalog
             </span>
+            {isShopifyLive && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[8px] font-semibold tracking-wider uppercase border border-emerald-200/60 ml-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Shopify Live
+              </span>
+            )}
           </div>
           <h2 className="editorial-serif text-2xl min-[360px]:text-3xl min-[480px]:text-4xl sm:text-5xl md:text-6xl font-normal tracking-tight text-[var(--theme-text)]">
             The Product Showcase
@@ -153,7 +195,7 @@ export default function ProductGrid() {
                 All {activeMegaConfig.name}
               </button>
               {activeMegaConfig.subFilters.map((sub) => {
-                const count = PRODUCTS.filter(
+                const count = allProducts.filter(
                   (p) => p.megaCategory === activeMega && p.subCategory === sub.id
                 ).length;
                 if (count === 0) return null;

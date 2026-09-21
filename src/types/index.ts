@@ -55,6 +55,7 @@ export interface ProductColor {
   hex: string;
   image: string;
   materialType?: 'acetate' | 'metal' | 'silk' | 'pearl' | 'tortoise' | 'fabric' | 'wood' | 'crystal' | 'satin';
+  variantId?: string;
 }
 
 export interface Product {
@@ -76,9 +77,10 @@ export interface Product {
   colors: ProductColor[];
   rating: number;
   reviewsCount: number;
-  badge?: 'Bestseller' | 'Editorial Pick' | 'New Runway' | 'Limited Edition' | 'Bridal' | 'Travel Essential';
+  badge?: 'Bestseller' | 'Editorial Pick' | 'New Runway' | 'Limited Edition' | 'Bridal' | 'Travel Essential' | 'Sold Out' | string;
   is3DSupported?: boolean;
   threeDType?: 'claw' | 'pin' | 'comb' | 'scrunchie';
+  availableForSale?: boolean;
 }
 
 export interface MegaCategoryTheme {
@@ -125,6 +127,8 @@ export interface CartItem {
   product: Product;
   selectedColor: ProductColor;
   quantity: number;
+  shopifyLineId?: string;
+  variantId?: string;
 }
 
 export interface CustomerReview {

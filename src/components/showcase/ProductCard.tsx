@@ -49,7 +49,12 @@ export default function ProductCard({ product, onQuickView, index = 0 }: Product
 
         {/* Badges */}
         <div className="absolute top-2 left-2 min-[360px]:top-2.5 min-[360px]:left-2.5 sm:top-3 sm:left-3 flex flex-col gap-1 z-10">
-          {product.badge && (
+          {product.availableForSale === false && (
+            <span className="glass-pill px-1.5 min-[360px]:px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[7.5px] min-[360px]:text-[8px] sm:text-[9px] font-semibold tracking-wider uppercase bg-stone-900/80 text-white shadow-sm">
+              Sold Out
+            </span>
+          )}
+          {product.badge && product.availableForSale !== false && (
             <span className="glass-pill px-1.5 min-[360px]:px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[7.5px] min-[360px]:text-[8px] sm:text-[9px] font-semibold tracking-wider uppercase text-[var(--theme-text)] shadow-sm">
               {product.badge}
             </span>
@@ -162,13 +167,19 @@ export default function ProductCard({ product, onQuickView, index = 0 }: Product
               )}
             </div>
 
-            <button
-              onClick={(e) => addToCart(product, currentColor, 1, e)}
-              className="px-2.5 min-[360px]:px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-[var(--theme-text)] text-[var(--theme-bg)] text-[9.5px] min-[360px]:text-[10px] sm:text-xs font-medium tracking-wider uppercase transition-all duration-300 hover:opacity-90 active:scale-95 shadow-md flex items-center gap-1 sm:gap-1.5 hover:shadow-lg whitespace-nowrap shrink-0"
-            >
-              <ShoppingBag className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-              <span>Add</span>
-            </button>
+            {product.availableForSale === false ? (
+              <span className="px-2.5 min-[360px]:px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-full bg-stone-100 text-stone-400 text-[9px] min-[360px]:text-[9.5px] sm:text-[10px] font-medium tracking-wider uppercase whitespace-nowrap shrink-0">
+                Sold Out
+              </span>
+            ) : (
+              <button
+                onClick={(e) => addToCart(product, currentColor, 1, e)}
+                className="px-2.5 min-[360px]:px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-[var(--theme-text)] text-[var(--theme-bg)] text-[9.5px] min-[360px]:text-[10px] sm:text-xs font-medium tracking-wider uppercase transition-all duration-300 hover:opacity-90 active:scale-95 shadow-md flex items-center gap-1 sm:gap-1.5 hover:shadow-lg whitespace-nowrap shrink-0"
+              >
+                <ShoppingBag className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                <span>Add</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

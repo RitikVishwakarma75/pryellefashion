@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '@/context/CartContext';
 import { PRODUCTS } from '@/data/products';
 import Image from 'next/image';
-import { X, Trash2, ShoppingBag, ArrowRight, Sparkles, Tag, Truck } from 'lucide-react';
+import { X, Trash2, ShoppingBag, ArrowRight, Sparkles, Tag, Truck, Lock } from 'lucide-react';
 
 export default function CartDrawer() {
   const {
@@ -24,9 +24,15 @@ export default function CartDrawer() {
     amountNeededForFreeShipping,
     addToCart,
     setIsCheckoutOpen,
+    isCartSyncing,
+    cartError,
+    clearCartError,
+    checkoutUrl,
   } = useCart();
 
   const [promoInput, setPromoInput] = useState('');
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   if (!isCartOpen) return null;
 
@@ -40,9 +46,52 @@ export default function CartDrawer() {
     }
   };
 
-  const handleProceedToCheckout = () => {
-    setIsCartOpen(false);
-    setIsCheckoutOpen(true);
+  const handleProceedToCheckout = async () => {
+    if (cart.length === 0) return;
+
+    setCheckoutError(null);
+
+    // 1. If a valid checkoutUrl already exists, redirect directly
+    if (checkoutUrl) {
+      setIsRedirecting(true);
+      window.location.href = checkoutUrl;
+      return;
+    }
+
+    // 2. If checkoutUrl is not yet loaded, request it via /api/shopify/cart
+    try {
+      setIsRedirecting(true);
+
+      const lines = cart
+        .filter((item) => item.variantId && item.variantId.startsWith('gid://shopify/'))
+        .map((item) => ({
+          merchandiseId: item.variantId!,
+          quantity: item.quantity,
+        }));
+
+      if (lines.length === 0) {
+        setCheckoutError('Please add a Shopify product to launch Shopify checkout.');
+        setIsRedirecting(false);
+        return;
+      }
+
+      const res = await fetch('/api/shopify/cart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create', lines }),
+      });
+      const data = await res.json();
+
+      if (data.success && data.cart?.checkoutUrl) {
+        window.location.href = data.cart.checkoutUrl;
+      } else {
+        setCheckoutError(data.error || 'Unable to connect to Shopify checkout. Please verify store configuration.');
+        setIsRedirecting(false);
+      }
+    } catch (err: any) {
+      setCheckoutError('Network error connecting to Shopify. Please try again.');
+      setIsRedirecting(false);
+    }
   };
 
   const progressPercent = Math.min(100, Math.round((subtotal / shippingThreshold) * 100));
@@ -74,6 +123,12 @@ export default function CartDrawer() {
               <h3 className="editorial-serif text-xl sm:text-2xl font-normal text-[var(--theme-text)]">
                 Your Shopping Bag ({cart.reduce((s, i) => s + i.quantity, 0)})
               </h3>
+              {isCartSyncing && (
+                <span className="flex items-center gap-1 text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  Syncing
+                </span>
+              )}
             </div>
             <button
               onClick={() => setIsCartOpen(false)}
@@ -111,6 +166,19 @@ export default function CartDrawer() {
               />
             </div>
           </div>
+
+          {/* Shopify Cart Sync Error Alert Banner (if any) */}
+          {cartError && (
+            <div className="px-4 py-2 bg-rose-50 border-b border-rose-200 flex items-center justify-between text-xs text-rose-700">
+              <span className="truncate pr-2">{cartError}</span>
+              <button
+                onClick={clearCartError}
+                className="text-[10px] uppercase font-bold text-rose-800 underline hover:no-underline flex-shrink-0"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
 
           {/* Cart Items Scroll Container */}
           <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-3 sm:space-y-4">
@@ -291,11 +359,28 @@ export default function CartDrawer() {
               {/* Checkout Button */}
               <button
                 onClick={handleProceedToCheckout}
-                className="w-full py-3.5 rounded-full bg-black text-white text-xs font-medium uppercase tracking-wider transition-all duration-300 hover:opacity-90 active:scale-95 shadow-xl flex items-center justify-center gap-2"
+                disabled={cart.length === 0 || isRedirecting}
+                className="w-full py-3.5 rounded-full bg-black text-white text-xs font-medium uppercase tracking-wider transition-all duration-300 hover:opacity-90 active:scale-95 shadow-xl flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <span>Proceed to Checkout</span>
-                <ArrowRight className="w-3.5 h-3.5" />
+                {isRedirecting ? (
+                  <>
+                    <span className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                    <span>Redirecting to Shopify Checkout...</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-3 h-3 text-emerald-400" />
+                    <span>Proceed to Secure Checkout</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </>
+                )}
               </button>
+
+              {checkoutError && (
+                <p className="text-[11px] text-rose-500 text-center font-medium pt-1">
+                  {checkoutError}
+                </p>
+              )}
             </div>
           )}
         </motion.div>

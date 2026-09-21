@@ -126,9 +126,15 @@ export default function QuickViewModal({ product, onClose }: QuickViewModalProps
                       ₹{product.originalPrice}
                     </span>
                   )}
-                  <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-medium">
-                    In Stock • Ready to Dispatch
-                  </span>
+                  {product.availableForSale === false ? (
+                    <span className="text-[10px] text-stone-600 bg-stone-100 px-2.5 py-0.5 rounded-full font-medium">
+                      Sold Out • Currently Unavailable
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full font-medium">
+                      In Stock • Ready to Dispatch
+                    </span>
+                  )}
                 </div>
 
                 {/* Description & Editorial Note */}
@@ -233,13 +239,22 @@ export default function QuickViewModal({ product, onClose }: QuickViewModalProps
                   </div>
 
                   {/* Add to Bag Button */}
-                  <button
-                    onClick={handleAdd}
-                    className="flex-1 py-3 sm:py-3.5 rounded-full bg-[var(--theme-text)] text-[var(--theme-bg)] text-xs font-semibold tracking-wider uppercase transition-all duration-300 hover:opacity-90 active:scale-95 shadow-lg flex items-center justify-center gap-2"
-                  >
-                    <ShoppingBag className="w-4 h-4" />
-                    <span>Add to Bag • ₹{product.price * quantity}</span>
-                  </button>
+                  {product.availableForSale === false ? (
+                    <button
+                      disabled
+                      className="flex-1 py-3 sm:py-3.5 rounded-full bg-stone-200 text-stone-400 text-xs font-semibold tracking-wider uppercase cursor-not-allowed shadow-none flex items-center justify-center gap-2"
+                    >
+                      <span>Sold Out</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleAdd}
+                      className="flex-1 py-3 sm:py-3.5 rounded-full bg-[var(--theme-text)] text-[var(--theme-bg)] text-xs font-semibold tracking-wider uppercase transition-all duration-300 hover:opacity-90 active:scale-95 shadow-lg flex items-center justify-center gap-2"
+                    >
+                      <ShoppingBag className="w-4 h-4" />
+                      <span>Add to Bag • ₹{product.price * quantity}</span>
+                    </button>
+                  )}
 
                   {/* Desktop / Tablet Wishlist */}
                   <button
