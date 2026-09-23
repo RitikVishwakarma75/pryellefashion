@@ -7,7 +7,7 @@ function getGuestSessionId(cookieStore: Awaited<ReturnType<typeof cookies>>): st
   return cookieStore.get('prayele_cart_session')?.value || null;
 }
 
-// GET — Fetch wishlist items
+// GET — Fetch wishlist items strictly isolated by user
 export async function GET() {
   try {
     const user = await getCurrentUser();
@@ -17,7 +17,7 @@ export async function GET() {
     const where = user
       ? { userId: user.userId }
       : sessionId
-        ? { sessionId }
+        ? { sessionId, userId: null }
         : { userId: '__none__' };
 
     const items = await prisma.wishlistItem.findMany({
@@ -46,24 +46,49 @@ export async function GET() {
   }
 }
 
-// POST — Add product to wishlist
+// POST — Add product to wishlist or merge on login
 export async function POST(req: Request) {
   try {
-    const { productId } = await req.json();
-    if (!productId) {
-      return NextResponse.json({ error: 'productId required' }, { status: 400 });
-    }
-
     const user = await getCurrentUser();
     const cookieStore = await cookies();
     const sessionId = getGuestSessionId(cookieStore);
+    const body = await req.json();
+
+    // Support merging guest wishlist on login
+    if (body.action === 'merge' && user && sessionId) {
+      const guestItems = await prisma.wishlistItem.findMany({
+        where: { sessionId, userId: null },
+      });
+
+      for (const item of guestItems) {
+        const exists = await prisma.wishlistItem.findFirst({
+          where: { userId: user.userId, productId: item.productId },
+        });
+
+        if (!exists) {
+          await prisma.wishlistItem.update({
+            where: { id: item.id },
+            data: { userId: user.userId, sessionId: null },
+          });
+        } else {
+          await prisma.wishlistItem.delete({ where: { id: item.id } });
+        }
+      }
+
+      return NextResponse.json({ success: true, action: 'merged' });
+    }
+
+    const { productId } = body;
+    if (!productId) {
+      return NextResponse.json({ error: 'productId required' }, { status: 400 });
+    }
 
     // Check for existing
     const existing = await prisma.wishlistItem.findFirst({
       where: user
         ? { userId: user.userId, productId }
         : sessionId
-          ? { sessionId, productId }
+          ? { sessionId, userId: null, productId }
           : { userId: '__none__', productId },
     });
 
@@ -85,7 +110,7 @@ export async function POST(req: Request) {
   }
 }
 
-// DELETE — Remove from wishlist
+// DELETE — Remove from wishlist with strict owner verification
 export async function DELETE(req: Request) {
   try {
     const { productId } = await req.json();
@@ -101,7 +126,7 @@ export async function DELETE(req: Request) {
       where: user
         ? { userId: user.userId, productId }
         : sessionId
-          ? { sessionId, productId }
+          ? { sessionId, userId: null, productId }
           : { userId: '__none__', productId },
     });
 

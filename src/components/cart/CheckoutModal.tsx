@@ -1,9 +1,23 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Link from 'next/link';
 import { useCart } from '@/context/CartContext';
-import { X, CheckCircle, Lock, CreditCard, Smartphone, Truck } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import { X, CheckCircle, Lock, CreditCard, Smartphone, Truck, MapPin, Sparkles } from 'lucide-react';
+
+interface SavedAddress {
+  id: string;
+  name: string;
+  phone: string;
+  addressLine1: string;
+  addressLine2?: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  isDefault: boolean;
+}
 
 export default function CheckoutModal() {
   const {
@@ -17,6 +31,7 @@ export default function CheckoutModal() {
     placeOrder,
     lastPlacedOrderId,
   } = useCart();
+  const { user, isAuthenticated } = useAuth();
 
   const [step, setStep] = useState<'details' | 'payment' | 'confirmed'>('details');
   const [formData, setFormData] = useState({
@@ -28,8 +43,59 @@ export default function CheckoutModal() {
     pincode: '400050',
     paymentMethod: 'upi',
   });
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string>('');
   const [orderId, setOrderId] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Sync user details and saved addresses when modal opens or user logs in
+  useEffect(() => {
+    if (isCheckoutOpen && isAuthenticated && user) {
+      setFormData((prev) => ({
+        ...prev,
+        name: user.name || prev.name,
+        email: user.email || prev.email,
+        phone: user.phone || prev.phone,
+      }));
+
+      // Fetch saved addresses
+      fetch('/api/addresses')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.addresses?.length > 0) {
+            setSavedAddresses(data.addresses);
+            const defaultAddr = data.addresses.find((a: SavedAddress) => a.isDefault) || data.addresses[0];
+            if (defaultAddr) {
+              setSelectedAddressId(defaultAddr.id);
+              setFormData((prev) => ({
+                ...prev,
+                name: defaultAddr.name || prev.name,
+                phone: defaultAddr.phone || prev.phone,
+                address: `${defaultAddr.addressLine1}${defaultAddr.addressLine2 ? `, ${defaultAddr.addressLine2}` : ''}`,
+                city: defaultAddr.city,
+                pincode: defaultAddr.postalCode,
+              }));
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isCheckoutOpen, isAuthenticated, user]);
+
+  const handleSelectSavedAddress = (addrId: string) => {
+    setSelectedAddressId(addrId);
+    const chosen = savedAddresses.find((a) => a.id === addrId);
+    if (chosen) {
+      setFormData((prev) => ({
+        ...prev,
+        name: chosen.name,
+        phone: chosen.phone,
+        address: `${chosen.addressLine1}${chosen.addressLine2 ? `, ${chosen.addressLine2}` : ''}`,
+        city: chosen.city,
+        pincode: chosen.postalCode,
+      }));
+    }
+  };
 
   if (!isCheckoutOpen) return null;
 
@@ -154,6 +220,52 @@ export default function CheckoutModal() {
                     Complimentary express delivery directly to your door in bespoke gift packaging.
                   </p>
                 </div>
+
+                {!isAuthenticated ? (
+                  <div className="p-3 rounded-2xl bg-[#C5A059]/10 border border-[#C5A059]/20 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2 text-stone-700">
+                      <Sparkles className="w-4 h-4 text-[#C5A059]" />
+                      <span>Already a member?</span>
+                    </div>
+                    <Link
+                      href="/login?redirect=/checkout"
+                      onClick={handleClose}
+                      className="text-xs font-semibold text-[#8C6D2B] hover:underline"
+                    >
+                      Sign In for 1-click addresses
+                    </Link>
+                  </div>
+                ) : (
+                  savedAddresses.length > 0 && (
+                    <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200">
+                      <label className="text-[11px] font-semibold text-stone-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-[#C5A059]" />
+                        Select from Saved Addresses:
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {savedAddresses.map((addr) => (
+                          <button
+                            key={addr.id}
+                            type="button"
+                            onClick={() => handleSelectSavedAddress(addr.id)}
+                            className={`px-3 py-1.5 rounded-xl text-xs text-left transition-all border ${
+                              selectedAddressId === addr.id
+                                ? 'bg-[#C5A059]/15 border-[#C5A059] text-stone-900 font-medium shadow-xs'
+                                : 'bg-white border-stone-200 text-stone-600 hover:border-stone-400'
+                            }`}
+                          >
+                            <span className="font-semibold">{addr.name}</span> — {addr.city} ({addr.postalCode})
+                            {addr.isDefault && (
+                              <span className="ml-1.5 text-[9px] uppercase px-1.5 py-0.5 bg-[#C5A059]/20 text-[#856526] rounded">
+                                Default
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                   <div>

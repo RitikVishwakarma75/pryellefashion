@@ -1,11 +1,14 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { useCart } from '@/context/CartContext';
-import { ShoppingBag, Compass, Box, Sparkles, LayoutGrid } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import { ShoppingBag, Box, Sparkles, LayoutGrid, User } from 'lucide-react';
 
 export default function MobileBottomBar() {
   const { totalItems, setIsCartOpen } = useCart();
+  const { user, isAuthenticated } = useAuth();
 
   const scrollToSection = (id: string) => {
     const el = document.getElementById(id);
@@ -47,14 +50,22 @@ export default function MobileBottomBar() {
           <span className="text-[8px] min-[360px]:text-[9px] uppercase tracking-wider font-medium">Styling</span>
         </button>
 
-        {/* Moods */}
-        <button
-          onClick={() => scrollToSection('find-your-look')}
+        {/* Account / Sign In */}
+        <Link
+          href={isAuthenticated ? '/account' : '/login'}
           className="flex flex-col items-center gap-0.5 py-1 px-1.5 min-[360px]:px-2.5 rounded-full text-white/75 hover:text-white active:scale-90 transition-all focus:outline-none"
         >
-          <Compass className="w-3.5 h-3.5 min-[360px]:w-4 min-[360px]:h-4" />
-          <span className="text-[8px] min-[360px]:text-[9px] uppercase tracking-wider font-medium">Moods</span>
-        </button>
+          {isAuthenticated && user ? (
+            <span className="w-4 h-4 rounded-full bg-[#C5A059] text-black text-[9px] font-bold flex items-center justify-center uppercase">
+              {user.name?.charAt(0) || 'U'}
+            </span>
+          ) : (
+            <User className="w-3.5 h-3.5 min-[360px]:w-4 min-[360px]:h-4" />
+          )}
+          <span className="text-[8px] min-[360px]:text-[9px] uppercase tracking-wider font-medium">
+            {isAuthenticated ? 'Account' : 'Sign In'}
+          </span>
+        </Link>
 
         {/* Bag */}
         <button
@@ -75,3 +86,4 @@ export default function MobileBottomBar() {
     </div>
   );
 }
+

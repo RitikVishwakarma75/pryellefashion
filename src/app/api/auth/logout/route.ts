@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { clearAuthCookie, getCurrentUser } from '@/lib/auth';
 
+import { cookies } from 'next/headers';
+
 export async function POST() {
   await clearAuthCookie();
+  const cookieStore = await cookies();
+  cookieStore.delete('prayele_cart_session');
   return NextResponse.json({ success: true });
 }
 

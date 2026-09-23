@@ -20,7 +20,7 @@ async function getSessionId(): Promise<string> {
   return sessionId;
 }
 
-// GET — Fetch current cart
+// GET — Fetch current isolated cart
 export async function GET() {
   try {
     const user = await getCurrentUser();
@@ -36,10 +36,24 @@ export async function GET() {
   }
 }
 
-// POST — Add item to cart
+// POST — Add item or merge carts
 export async function POST(req: Request) {
   try {
-    const { productId, variantId, quantity } = await req.json();
+    const user = await getCurrentUser();
+    const sessionId = await getSessionId();
+    const body = await req.json();
+
+    // Handle guest-to-member cart merge
+    if (body.action === 'merge' && user) {
+      const guestSessionId = body.guestSessionId || sessionId;
+      if (guestSessionId) {
+        await cartService.mergeGuestCart(guestSessionId, user.userId);
+      }
+      const mergedCart = await cartService.getOrCreateCart(sessionId, user.userId);
+      return NextResponse.json({ success: true, cart: mergedCart });
+    }
+
+    const { productId, variantId, quantity } = body;
 
     if (!productId) {
       return NextResponse.json(
@@ -48,8 +62,6 @@ export async function POST(req: Request) {
       );
     }
 
-    const user = await getCurrentUser();
-    const sessionId = await getSessionId();
     const cart = await cartService.getOrCreateCart(sessionId, user?.userId);
 
     if (!cart) {
@@ -70,11 +82,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
-    // Return updated cart
-    const updatedCart = await cartService.getOrCreateCart(
-      sessionId,
-      user?.userId
-    );
+    const updatedCart = await cartService.getOrCreateCart(sessionId, user?.userId);
     return NextResponse.json({ success: true, cart: updatedCart });
   } catch (error) {
     return NextResponse.json(
@@ -84,9 +92,17 @@ export async function POST(req: Request) {
   }
 }
 
-// PATCH — Update item quantity
+// PATCH — Update item quantity with ownership verification
 export async function PATCH(req: Request) {
   try {
+    const user = await getCurrentUser();
+    const sessionId = await getSessionId();
+    const cart = await cartService.getOrCreateCart(sessionId, user?.userId);
+
+    if (!cart) {
+      return NextResponse.json({ error: 'Cart not found' }, { status: 404 });
+    }
+
     const { itemId, quantity } = await req.json();
 
     if (!itemId || quantity === undefined) {
@@ -96,8 +112,16 @@ export async function PATCH(req: Request) {
       );
     }
 
+    // Verify item belongs strictly to THIS cart
+    const item = await prisma.cartItem.findFirst({
+      where: { id: itemId, cartId: cart.id },
+    });
+
+    if (!item) {
+      return NextResponse.json({ error: 'Cart item not found' }, { status: 404 });
+    }
+
     if (quantity <= 0) {
-      // Remove item
       await prisma.cartItem.delete({ where: { id: itemId } });
     } else {
       await prisma.cartItem.update({
@@ -106,23 +130,9 @@ export async function PATCH(req: Request) {
       });
     }
 
-    // Recalculate
-    const item = await prisma.cartItem.findFirst({
-      where: { id: itemId },
-      select: { cartId: true },
-    });
+    await cartService.recalculateCartTotals(cart.id);
 
-    if (item) {
-      await cartService.recalculateCartTotals(item.cartId);
-    }
-
-    const user = await getCurrentUser();
-    const sessionId = await getSessionId();
-    const updatedCart = await cartService.getOrCreateCart(
-      sessionId,
-      user?.userId
-    );
-
+    const updatedCart = await cartService.getOrCreateCart(sessionId, user?.userId);
     return NextResponse.json({ success: true, cart: updatedCart });
   } catch (error) {
     return NextResponse.json(
@@ -132,36 +142,46 @@ export async function PATCH(req: Request) {
   }
 }
 
-// DELETE — Remove item from cart
+// DELETE — Remove item or clear cart with ownership verification
 export async function DELETE(req: Request) {
   try {
-    const { itemId } = await req.json();
-
-    if (!itemId) {
-      return NextResponse.json(
-        { error: 'itemId is required' },
-        { status: 400 }
-      );
-    }
-
-    const item = await prisma.cartItem.findFirst({
-      where: { id: itemId },
-      select: { cartId: true },
-    });
-
-    await prisma.cartItem.delete({ where: { id: itemId } });
-
-    if (item) {
-      await cartService.recalculateCartTotals(item.cartId);
-    }
-
     const user = await getCurrentUser();
     const sessionId = await getSessionId();
-    const updatedCart = await cartService.getOrCreateCart(
-      sessionId,
-      user?.userId
-    );
+    const cart = await cartService.getOrCreateCart(sessionId, user?.userId);
 
+    if (!cart) {
+      return NextResponse.json({ error: 'Cart not found' }, { status: 404 });
+    }
+
+    const body = await req.json().catch(() => ({}));
+
+    if (body.clearAll) {
+      await prisma.cartItem.deleteMany({
+        where: { cartId: cart.id },
+      });
+      await cartService.recalculateCartTotals(cart.id);
+      const updatedCart = await cartService.getOrCreateCart(sessionId, user?.userId);
+      return NextResponse.json({ success: true, cart: updatedCart });
+    }
+
+    const { itemId } = body;
+    if (!itemId) {
+      return NextResponse.json({ error: 'itemId is required' }, { status: 400 });
+    }
+
+    // Verify item belongs strictly to this user's cart
+    const item = await prisma.cartItem.findFirst({
+      where: { id: itemId, cartId: cart.id },
+    });
+
+    if (!item) {
+      return NextResponse.json({ error: 'Cart item not found' }, { status: 404 });
+    }
+
+    await prisma.cartItem.delete({ where: { id: itemId } });
+    await cartService.recalculateCartTotals(cart.id);
+
+    const updatedCart = await cartService.getOrCreateCart(sessionId, user?.userId);
     return NextResponse.json({ success: true, cart: updatedCart });
   } catch (error) {
     return NextResponse.json(

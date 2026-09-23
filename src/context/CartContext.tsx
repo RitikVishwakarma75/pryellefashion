@@ -3,12 +3,13 @@
 import React, {
   createContext,
   useContext,
-  useMemo,
   useState,
-  useSyncExternalStore,
+  useEffect,
+  useCallback,
   ReactNode,
 } from 'react';
 import { CartItem, Product, ProductColor, ShippingDetails } from '@/types';
+import { useAuth } from '@/context/AuthContext';
 import confetti from 'canvas-confetti';
 
 interface FlyItem {
@@ -45,50 +46,16 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 const FREE_SHIPPING_THRESHOLD = 999;
-const CART_STORAGE_KEY = 'prayele_cart';
-const CART_EVENT = 'prayele-cart-change';
 
-function subscribeToCart(onStoreChange: () => void) {
-  window.addEventListener('storage', onStoreChange);
-  window.addEventListener(CART_EVENT, onStoreChange);
-  return () => {
-    window.removeEventListener('storage', onStoreChange);
-    window.removeEventListener(CART_EVENT, onStoreChange);
-  };
-}
-
-function getCartSnapshot() {
-  try {
-    return localStorage.getItem(CART_STORAGE_KEY) ?? '[]';
-  } catch {
-    return '[]';
-  }
-}
-
-function getServerCartSnapshot() {
-  return '[]';
-}
-
-function writeCart(next: CartItem[]) {
-  try {
-    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(next));
-  } catch {
-    console.warn('Failed to save cart to storage');
-  }
-  window.dispatchEvent(new Event(CART_EVENT));
+function getCartStorageKey(userId?: string | null): string {
+  return userId ? `prayele_cart_${userId}` : 'prayele_cart_guest';
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const cartJson = useSyncExternalStore(subscribeToCart, getCartSnapshot, getServerCartSnapshot);
-  const cart = useMemo<CartItem[]>(() => {
-    try {
-      const parsed = JSON.parse(cartJson);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }, [cartJson]);
+  const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
+  const [cart, setCartState] = useState<CartItem[]>([]);
+  const [activeUserId, setActiveUserId] = useState<string | null | undefined>(undefined);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [promoCode, setPromoCode] = useState('');
   const [discountPercent, setDiscountPercent] = useState(0);
@@ -97,10 +64,108 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [lastPlacedOrderId, setLastPlacedOrderId] = useState<string | null>(null);
 
-  const setCart = (updater: CartItem[] | ((prev: CartItem[]) => CartItem[])) => {
-    const next = typeof updater === 'function' ? updater(cart) : updater;
-    writeCart(next);
-  };
+  // Helper to persist to isolated storage
+  const persistCart = useCallback((items: CartItem[], uid?: string | null) => {
+    try {
+      const key = getCartStorageKey(uid);
+      localStorage.setItem(key, JSON.stringify(items));
+    } catch (e) {
+      console.warn('Failed to save isolated cart to storage', e);
+    }
+  }, []);
+
+  // Handle User Switching & Isolated Cart Hydration
+  useEffect(() => {
+    if (isAuthLoading) return;
+
+    const currentUid = user?.userId || null;
+
+    // Discard any obsolete un-scoped legacy cart
+    try {
+      localStorage.removeItem('prayele_cart');
+    } catch {}
+
+    if (activeUserId !== currentUid) {
+      // Transitioning: Guest -> Logged In
+      if (!activeUserId && currentUid) {
+        let guestItems: CartItem[] = [];
+        try {
+          const rawGuest = localStorage.getItem('prayele_cart_guest');
+          if (rawGuest) guestItems = JSON.parse(rawGuest);
+        } catch {}
+
+        let userItems: CartItem[] = [];
+        try {
+          const rawUser = localStorage.getItem(`prayele_cart_${currentUid}`);
+          if (rawUser) userItems = JSON.parse(rawUser);
+        } catch {}
+
+        // Merge guest items into user items without duplicating IDs
+        let merged = [...userItems];
+        if (guestItems.length > 0) {
+          for (const gItem of guestItems) {
+            const idx = merged.findIndex((i) => i.id === gItem.id);
+            if (idx > -1) {
+              merged[idx] = { ...merged[idx], quantity: merged[idx].quantity + gItem.quantity };
+            } else {
+              merged.push(gItem);
+            }
+          }
+          // Clear guest cart once safely merged
+          try {
+            localStorage.removeItem('prayele_cart_guest');
+          } catch {}
+
+          // Also trigger server-side merge
+          fetch('/api/cart', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'merge' }),
+          }).catch(() => {});
+        }
+
+        persistCart(merged, currentUid);
+        setCartState(merged);
+      }
+      // Transitioning: Logged In -> Logged Out (Logout)
+      else if (activeUserId && !currentUid) {
+        // Clear active cart immediately so User A's items vanish
+        setCartState([]);
+        // Re-initialize clean guest cart
+        try {
+          const rawGuest = localStorage.getItem('prayele_cart_guest');
+          const guestItems = rawGuest ? JSON.parse(rawGuest) : [];
+          setCartState(Array.isArray(guestItems) ? guestItems : []);
+        } catch {
+          setCartState([]);
+        }
+      }
+      // Initial mount or switching between accounts
+      else {
+        try {
+          const raw = localStorage.getItem(getCartStorageKey(currentUid));
+          const parsed = raw ? JSON.parse(raw) : [];
+          setCartState(Array.isArray(parsed) ? parsed : []);
+        } catch {
+          setCartState([]);
+        }
+      }
+
+      setActiveUserId(currentUid);
+    }
+  }, [user, activeUserId, isAuthLoading, persistCart]);
+
+  // Synchronize cart state mutations with isolated storage & server
+  const setCart = useCallback(
+    (updater: CartItem[] | ((prev: CartItem[]) => CartItem[])) => {
+      setCartState((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater;
+        persistCart(next, user?.userId);
+        return next;
+      });
+    },
+    [persistCart, user?.userId]
+  );
 
   const addToCart = (
     product: Product,
@@ -143,6 +208,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
       ];
     });
 
+    // Sync to backend DB if authenticated
+    if (isAuthenticated) {
+      const variantId = `${product.id}-${selectedColor.name.toLowerCase().replace(/\s+/g, '-')}`;
+      fetch('/api/cart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId: product.id,
+          variantId,
+          quantity,
+        }),
+      }).catch(() => {});
+    }
+
     setTimeout(() => {
       setIsCartOpen(true);
     }, 450);
@@ -150,6 +229,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const removeFromCart = (itemId: string) => {
     setCart((prev) => prev.filter((item) => item.id !== itemId));
+
+    if (isAuthenticated) {
+      fetch('/api/cart', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemId }),
+      }).catch(() => {});
+    }
   };
 
   const updateQuantity = (itemId: string, qty: number) => {
@@ -160,10 +247,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setCart((prev) =>
       prev.map((item) => (item.id === itemId ? { ...item, quantity: qty } : item))
     );
+
+    if (isAuthenticated) {
+      fetch('/api/cart', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemId, quantity: qty }),
+      }).catch(() => {});
+    }
   };
 
   const clearCart = () => {
     setCart([]);
+    if (isAuthenticated) {
+      fetch('/api/cart', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clearAll: true }),
+      }).catch(() => {});
+    }
   };
 
   const applyPromoCode = (code: string): boolean => {

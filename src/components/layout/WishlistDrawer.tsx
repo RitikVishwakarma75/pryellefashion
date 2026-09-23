@@ -2,10 +2,11 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Link from 'next/link';
+import Image from 'next/image';
 import { useWishlist } from '@/context/WishlistContext';
 import { useCart } from '@/context/CartContext';
-import Image from 'next/image';
-import { X, Trash2, Heart, ShoppingBag } from 'lucide-react';
+import { X, Trash2, Heart, ShoppingBag, ExternalLink } from 'lucide-react';
 
 export default function WishlistDrawer() {
   const { wishlist, isWishlistOpen, setIsWishlistOpen, toggleWishlist } = useWishlist();
@@ -60,66 +61,75 @@ export default function WishlistDrawer() {
                 <p className="text-xs text-stone-500 max-w-xs mx-auto mb-6">
                   Click the heart icon on any hairpiece to save it to your private moodboard.
                 </p>
-                <button
+                <Link
+                  href="/shop"
                   onClick={() => setIsWishlistOpen(false)}
-                  className="px-6 py-2.5 rounded-full bg-black text-white text-xs font-medium uppercase tracking-wider hover:opacity-90"
+                  className="inline-block px-6 py-2.5 rounded-full bg-black text-white text-xs font-medium uppercase tracking-wider hover:opacity-90"
                 >
                   Browse Catalog
-                </button>
+                </Link>
               </div>
             ) : (
-              wishlist.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex gap-4 p-3 rounded-2xl bg-stone-50 border border-black/5 items-center"
-                >
-                  <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-stone-200 flex-shrink-0">
-                    <Image
-                      src={item.colors[0].image}
-                      alt={item.name}
-                      fill
-                      sizes="64px"
-                      className="object-cover"
-                    />
-                  </div>
+              wishlist.map((item) => {
+                const color = item.colors?.[0] || { name: 'Default', hex: '#C5A059', image: '' };
+                const imageSrc = color.image || '/placeholder.jpg';
 
-                  <div className="flex-1 min-w-0">
-                    <h4 className="editorial-serif text-sm font-medium text-stone-900 truncate">
-                      {item.name}
-                    </h4>
-                    <span className="text-xs font-semibold text-stone-900 block my-0.5">
-                      ₹{item.price}
-                    </span>
+                return (
+                  <div
+                    key={item.id}
+                    className="flex gap-4 p-3 rounded-2xl bg-stone-50 border border-black/5 items-center"
+                  >
+                    <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-stone-200 flex-shrink-0">
+                      <Image
+                        src={imageSrc}
+                        alt={item.name}
+                        fill
+                        sizes="64px"
+                        className="object-cover"
+                      />
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <h4 className="editorial-serif text-sm font-medium text-stone-900 truncate">
+                        {item.name}
+                      </h4>
+                      <span className="text-xs font-semibold text-stone-900 block my-0.5">
+                        ₹{item.price}
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          addToCart(item, color, 1, e);
+                          toggleWishlist(item);
+                        }}
+                        className="text-[11px] text-[var(--theme-accent)] font-semibold uppercase tracking-wider hover:underline flex items-center gap-1"
+                      >
+                        <ShoppingBag className="w-3 h-3" />
+                        <span>Move to Bag</span>
+                      </button>
+                    </div>
+
                     <button
-                      onClick={(e) => {
-                        addToCart(item, item.colors[0], 1, e);
-                        toggleWishlist(item);
-                      }}
-                      className="text-[11px] text-[var(--theme-accent)] font-semibold uppercase tracking-wider hover:underline flex items-center gap-1"
+                      onClick={() => toggleWishlist(item)}
+                      className="text-stone-400 hover:text-rose-500 transition-colors p-1"
+                      title="Remove from favorites"
                     >
-                      <ShoppingBag className="w-3 h-3" />
-                      <span>Move to Bag</span>
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
-
-                  <button
-                    onClick={() => toggleWishlist(item)}
-                    className="text-stone-400 hover:text-rose-500 transition-colors p-1"
-                    title="Remove from favorites"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
 
           {/* Footer */}
           {wishlist.length > 0 && (
-            <div className="p-5 border-t border-black/5 bg-stone-50">
+            <div className="p-5 border-t border-black/5 bg-stone-50 space-y-2">
               <button
                 onClick={(e) => {
-                  wishlist.forEach((item) => addToCart(item, item.colors[0], 1, e));
+                  wishlist.forEach((item) => {
+                    const color = item.colors?.[0] || { name: 'Default', hex: '#C5A059', image: '' };
+                    addToCart(item, color, 1, e);
+                  });
                   setIsWishlistOpen(false);
                 }}
                 className="w-full py-3.5 rounded-full bg-black text-white text-xs font-medium uppercase tracking-wider hover:opacity-90 shadow-lg flex items-center justify-center gap-2"
@@ -127,6 +137,15 @@ export default function WishlistDrawer() {
                 <ShoppingBag className="w-4 h-4" />
                 <span>Move All to Bag ({wishlist.length} Items)</span>
               </button>
+
+              <Link
+                href="/account/wishlist"
+                onClick={() => setIsWishlistOpen(false)}
+                className="w-full py-2.5 rounded-full border border-stone-300 text-stone-700 hover:text-black text-xs font-medium uppercase tracking-wider text-center flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <span>View Full Moodboard Page</span>
+                <ExternalLink className="w-3 h-3" />
+              </Link>
             </div>
           )}
         </motion.div>

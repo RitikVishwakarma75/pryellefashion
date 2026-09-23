@@ -6,12 +6,18 @@ import { Decimal } from '@prisma/client/runtime/library';
 
 export const cartService = {
   /**
-   * Get or create a cart for a session or user
+   * Get or create a cart strictly isolated for a session or user
    */
   async getOrCreateCart(sessionId: string, userId?: string) {
     try {
+      // If user is authenticated, query strictly by userId
+      // If guest, query strictly by sessionId and userId == null
+      const whereCondition = userId
+        ? { userId }
+        : { sessionId, userId: null };
+
       let cart = await prisma.cart.findFirst({
-        where: userId ? { userId } : { sessionId },
+        where: whereCondition,
         include: {
           items: {
             include: {
@@ -21,6 +27,12 @@ export const cartService = {
                   name: true,
                   slug: true,
                   basePrice: true,
+                  material: true,
+                  images: {
+                    include: { media: true },
+                    where: { isPrimary: true },
+                    take: 1,
+                  },
                 },
               },
               variant: {
@@ -40,10 +52,11 @@ export const cartService = {
       });
 
       if (!cart) {
+        const uniqueSessionId = userId ? `user_cart_${userId}` : sessionId;
         cart = await prisma.cart.create({
           data: {
-            sessionId,
-            userId,
+            sessionId: uniqueSessionId,
+            userId: userId || null,
             subtotal: new Decimal(0),
             discount: new Decimal(0),
             shipping: new Decimal(0),
@@ -53,7 +66,18 @@ export const cartService = {
             items: {
               include: {
                 product: {
-                  select: { id: true, name: true, slug: true, basePrice: true },
+                  select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                    basePrice: true,
+                    material: true,
+                    images: {
+                      include: { media: true },
+                      where: { isPrimary: true },
+                      take: 1,
+                    },
+                  },
                 },
                 variant: {
                   select: {
