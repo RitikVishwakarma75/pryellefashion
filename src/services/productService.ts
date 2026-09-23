@@ -308,6 +308,15 @@ export async function createProduct(data: {
     }
   }
 
+  let parsedWeight: number | null = null;
+  if (data.weight) {
+    const match = String(data.weight).match(/[\d.]+/);
+    if (match) {
+      const val = parseFloat(match[0]);
+      if (!isNaN(val)) parsedWeight = val;
+    }
+  }
+
   return prisma.product.create({
     data: {
       name: data.name,
@@ -315,13 +324,13 @@ export async function createProduct(data: {
       description: data.description,
       shortDescription: data.shortDescription,
       categoryId: resolvedCategoryId,
-      basePrice: data.basePrice,
-      compareAtPrice: data.compareAtPrice,
+      basePrice: Number(data.basePrice),
+      compareAtPrice: data.compareAtPrice ? Number(data.compareAtPrice) : null,
       material: data.material,
       holdStrength: data.holdStrength,
       hairTypes: data.hairTypes || [],
       dimensions: data.dimensions,
-      weight: data.weight,
+      weight: parsedWeight,
       isFeatured: data.isFeatured ?? false,
       isNew: data.isNew ?? true,
       isBestSeller: data.isBestSeller ?? false,
@@ -335,14 +344,14 @@ export async function createProduct(data: {
           color: v.color,
           colorHex: v.colorHex,
           finish: v.finish,
-          price: v.price,
-          compareAtPrice: v.compareAtPrice,
-          stockQuantity: v.stock || 15,
+          price: Number(v.price),
+          compareAtPrice: v.compareAtPrice ? Number(v.compareAtPrice) : null,
+          stockQuantity: Number(v.stock) || 15,
           reservedQuantity: 0,
           inventoryTransactions: {
             create: {
               type: 'RESTOCK',
-              quantity: v.stock || 15,
+              quantity: Number(v.stock) || 15,
               reference: 'INITIAL_ONBOARDING',
               reason: 'Initial variant inventory creation',
             },
