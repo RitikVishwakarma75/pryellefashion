@@ -1,20 +1,109 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { PRODUCTS } from '@/data/products';
 import { CATEGORIES } from '@/data/categories';
-import { Product, MegaCategory, SubCategory } from '@/types';
+import { Product } from '@/types';
 import ProductCard from './ProductCard';
 import QuickViewModal from './QuickViewModal';
 import { Sparkles, SlidersHorizontal, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+interface DbVariant {
+  name: string;
+  color?: string;
+  colorHex?: string;
+}
+
+interface DbImage {
+  url?: string;
+  media?: { url?: string };
+}
+
+interface DbProductItem {
+  id: string;
+  name: string;
+  slug: string;
+  shortDescription?: string;
+  description: string;
+  basePrice?: number;
+  price?: number;
+  compareAtPrice?: number | null;
+  material: string;
+  dimensions?: string;
+  holdStrength?: string;
+  hairTypes?: string[];
+  isBestSeller?: boolean;
+  isNew?: boolean;
+  category?: { slug?: string; parent?: { slug?: string } | null } | null;
+  collections?: Array<{ collection?: { slug?: string } }>;
+  variants?: DbVariant[];
+  images?: DbImage[];
+}
+
 export default function ProductGrid() {
+  const [productsList, setProductsList] = useState<Product[]>(PRODUCTS);
   const [activeMega, setActiveMega] = useState<string>('all');
   const [activeSub, setActiveSub] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'featured' | 'price-asc' | 'price-desc' | 'rating'>('featured');
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
   const [showAllProducts, setShowAllProducts] = useState(false);
+
+  useEffect(() => {
+    let ignore = false;
+    async function fetchFromDb() {
+      try {
+        const res = await fetch('/api/products?limit=300');
+        const data = await res.json();
+        if (!ignore && data.products && data.products.length > 0) {
+          const adapted: Product[] = data.products.map((p: DbProductItem) => {
+            const firstImg =
+              p.images?.[0]?.media?.url ||
+              p.images?.[0]?.url ||
+              '/images/products/claw-clip.jpg';
+            return {
+              id: p.id,
+              name: p.name,
+              subtitle: p.shortDescription || '',
+              megaCategory: (p.category?.parent?.slug ||
+                p.category?.slug ||
+                'clips-clutches') as Product['megaCategory'],
+              subCategory: (p.category?.slug || 'claw-clip') as Product['subCategory'],
+              collection: (p.collections?.[0]?.collection?.slug ||
+                'everyday') as Product['collection'],
+              price: Number(p.basePrice || p.price || 0),
+              originalPrice: p.compareAtPrice ? Number(p.compareAtPrice) : undefined,
+              description: p.description,
+              editorialNote: 'Artisanal atelier handcrafted creation.',
+              material: p.material,
+              dimensions: p.dimensions || '10.5 cm',
+              holdStrength: (p.holdStrength || 'Medium') as Product['holdStrength'],
+              hairTypes: p.hairTypes || ['All Hair Types'],
+              colors:
+                p.variants && p.variants.length > 0
+                  ? p.variants.map((v) => ({
+                      name: v.color || v.name,
+                      hex: v.colorHex || '#C5A059',
+                      image: firstImg,
+                    }))
+                  : [{ name: 'Standard', hex: '#C5A059', image: firstImg }],
+              rating: 4.9,
+              reviewsCount: 124,
+              badge: p.isBestSeller ? 'Bestseller' : p.isNew ? 'New Runway' : undefined,
+              slug: p.slug,
+            };
+          });
+          setProductsList(adapted);
+        }
+      } catch {
+        // Fallback to static PRODUCTS
+      }
+    }
+    fetchFromDb();
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   // Get active mega-category config for sub-filters
   const activeMegaConfig = CATEGORIES.find((c) => c.id === activeMega);
@@ -22,30 +111,32 @@ export default function ProductGrid() {
   // Build mega-category tabs with product counts
   const megaTabs = useMemo(() => {
     const tabs = [
-      { id: 'all', emoji: '✨', label: 'All Creations', count: PRODUCTS.length },
+      { id: 'all', emoji: '✨', label: 'All Creations', count: productsList.length },
     ];
     CATEGORIES.forEach((cat) => {
-      const count = PRODUCTS.filter((p) => p.megaCategory === cat.id).length;
+      const count = productsList.filter((p) => p.megaCategory === cat.id).length;
       tabs.push({ id: cat.id, emoji: cat.emoji, label: cat.name, count });
     });
     return tabs;
-  }, []);
+  }, [productsList]);
 
   // Filter items
-  let filtered = PRODUCTS.filter((p) => {
-    if (activeMega !== 'all' && p.megaCategory !== activeMega) return false;
-    if (activeSub !== 'all' && p.subCategory !== activeSub) return false;
-    return true;
-  });
+  const filtered = useMemo(() => {
+    let items = productsList.filter((p) => {
+      if (activeMega !== 'all' && p.megaCategory !== activeMega) return false;
+      if (activeSub !== 'all' && p.subCategory !== activeSub) return false;
+      return true;
+    });
 
-  // Sort items
-  if (sortBy === 'price-asc') {
-    filtered = [...filtered].sort((a, b) => a.price - b.price);
-  } else if (sortBy === 'price-desc') {
-    filtered = [...filtered].sort((a, b) => b.price - a.price);
-  } else if (sortBy === 'rating') {
-    filtered = [...filtered].sort((a, b) => b.rating - a.rating);
-  }
+    if (sortBy === 'price-asc') {
+      items = [...items].sort((a, b) => a.price - b.price);
+    } else if (sortBy === 'price-desc') {
+      items = [...items].sort((a, b) => b.price - a.price);
+    } else if (sortBy === 'rating') {
+      items = [...items].sort((a, b) => b.rating - a.rating);
+    }
+    return items;
+  }, [productsList, activeMega, activeSub, sortBy]);
 
   // Limit displayed products unless "show all" is active
   const INITIAL_LIMIT = 12;
@@ -89,7 +180,9 @@ export default function ProductGrid() {
           </div>
           <select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
+            onChange={(e) =>
+              setSortBy(e.target.value as 'featured' | 'price-asc' | 'price-desc' | 'rating')
+            }
             className="glass-pill px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-full text-[11px] min-[360px]:text-xs font-medium text-[var(--theme-text)] focus:outline-none cursor-pointer bg-white/70"
           >
             <option value="featured">Featured Curations</option>

@@ -5,14 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
 import { useTheme } from '@/context/ThemeContext';
 import { PRODUCTS } from '@/data/products';
-import { Sparkles, Eye, Info, Check } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 
-interface FloatingHero3DProps {
-  onOpenQuickView?: (productId: string) => void;
-}
-
-export default function FloatingHero3D({ onOpenQuickView }: FloatingHero3DProps) {
+export default function FloatingHero3D() {
   const { currentTheme } = useTheme();
   const { addToCart } = useCart();
   const [activeCallout, setActiveCallout] = useState<number | null>(null);

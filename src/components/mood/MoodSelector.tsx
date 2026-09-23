@@ -8,7 +8,7 @@ import { PRODUCTS } from '@/data/products';
 import { useCart } from '@/context/CartContext';
 import { MoodType } from '@/types';
 import Image from 'next/image';
-import { Sparkles, ShoppingBag, Check, ArrowRight } from 'lucide-react';
+import { Sparkles, ShoppingBag, Check } from 'lucide-react';
 
 export default function MoodSelector() {
   const { activeMood, setActiveMood } = useTheme();

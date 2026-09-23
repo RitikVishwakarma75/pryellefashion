@@ -6,7 +6,7 @@ import { PRODUCTS } from '@/data/products';
 import { Product } from '@/types';
 import { useCart } from '@/context/CartContext';
 import Image from 'next/image';
-import { Search, X, ArrowRight, Sparkles } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 
 interface SearchModalProps {
   isOpen: boolean;

@@ -1,7 +1,14 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { CartItem, Product, ProductColor } from '@/types';
+import React, {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  ReactNode,
+} from 'react';
+import { CartItem, Product, ProductColor, ShippingDetails } from '@/types';
 import confetti from 'canvas-confetti';
 
 interface FlyItem {
@@ -31,16 +38,57 @@ interface CartContextType {
   flyItem: FlyItem | null;
   isCheckoutOpen: boolean;
   setIsCheckoutOpen: (open: boolean) => void;
-  placeOrder: (shippingDetails: any) => Promise<string>;
+  placeOrder: (shippingDetails: ShippingDetails) => Promise<string>;
   lastPlacedOrderId: string | null;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 const FREE_SHIPPING_THRESHOLD = 999;
+const CART_STORAGE_KEY = 'prayele_cart';
+const CART_EVENT = 'prayele-cart-change';
+
+function subscribeToCart(onStoreChange: () => void) {
+  window.addEventListener('storage', onStoreChange);
+  window.addEventListener(CART_EVENT, onStoreChange);
+  return () => {
+    window.removeEventListener('storage', onStoreChange);
+    window.removeEventListener(CART_EVENT, onStoreChange);
+  };
+}
+
+function getCartSnapshot() {
+  try {
+    return localStorage.getItem(CART_STORAGE_KEY) ?? '[]';
+  } catch {
+    return '[]';
+  }
+}
+
+function getServerCartSnapshot() {
+  return '[]';
+}
+
+function writeCart(next: CartItem[]) {
+  try {
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    console.warn('Failed to save cart to storage');
+  }
+  window.dispatchEvent(new Event(CART_EVENT));
+}
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const cartJson = useSyncExternalStore(subscribeToCart, getCartSnapshot, getServerCartSnapshot);
+  const cart = useMemo<CartItem[]>(() => {
+    try {
+      const parsed = JSON.parse(cartJson);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }, [cartJson]);
+
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [promoCode, setPromoCode] = useState('');
   const [discountPercent, setDiscountPercent] = useState(0);
@@ -49,26 +97,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [lastPlacedOrderId, setLastPlacedOrderId] = useState<string | null>(null);
 
-  // Load cart from localStorage on client mount
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('prayele_cart');
-      if (saved) {
-        setCart(JSON.parse(saved));
-      }
-    } catch (e) {
-      console.warn('Failed to load cart from storage');
-    }
-  }, []);
-
-  // Save cart to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem('prayele_cart', JSON.stringify(cart));
-    } catch (e) {
-      console.warn('Failed to save cart to storage');
-    }
-  }, [cart]);
+  const setCart = (updater: CartItem[] | ((prev: CartItem[]) => CartItem[])) => {
+    const next = typeof updater === 'function' ? updater(cart) : updater;
+    writeCart(next);
+  };
 
   const addToCart = (
     product: Product,
@@ -79,7 +111,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const selectedColor = color || product.colors[0];
     const itemId = `${product.id}-${selectedColor.name.toLowerCase().replace(/\s+/g, '-')}`;
 
-    // Trigger fly-to-cart animation if click coordinates available
     if (event) {
       const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
       setFlyItem({
@@ -112,7 +143,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
       ];
     });
 
-    // Auto open drawer after short delay
     setTimeout(() => {
       setIsCartOpen(true);
     }, 450);
@@ -160,12 +190,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const isFreeShipping = subtotal >= FREE_SHIPPING_THRESHOLD;
   const amountNeededForFreeShipping = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal);
 
-  const placeOrder = async (shippingDetails: any): Promise<string> => {
+  const placeOrder = async (_shippingDetails: ShippingDetails): Promise<string> => {
+    void _shippingDetails;
     const orderId = `PRY-${Math.floor(100000 + Math.random() * 900000)}`;
     setLastPlacedOrderId(orderId);
     clearCart();
 
-    // Trigger celebration confetti
     try {
       confetti({
         particleCount: 80,
@@ -173,7 +203,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         origin: { y: 0.6 },
         colors: ['#C5A059', '#D98B94', '#E6B85C', '#181716'],
       });
-    } catch (e) {
+    } catch {
       // Confetti fallback
     }
 

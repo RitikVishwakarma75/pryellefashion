@@ -1,15 +1,22 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ArrowRight, ShieldCheck, Sparkles, Truck, RefreshCw, Heart } from 'lucide-react';
+import { ShieldCheck, Sparkles, Truck, RefreshCw } from 'lucide-react';
 
 export default function Footer() {
   const [email, setEmail] = useState('');
   const [isSubscribed, setIsSubscribed] = useState(false);
 
-  const handleSubscribe = (e: React.FormEvent) => {
+  const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
     if (email.trim()) {
+      try {
+        await fetch('/api/newsletter', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+      } catch {}
       setIsSubscribed(true);
       setEmail('');
     }

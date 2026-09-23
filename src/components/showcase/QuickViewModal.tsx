@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { Product } from '@/types';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import Image from 'next/image';
-import { X, Heart, Star, ShoppingBag, ShieldCheck, Truck, RefreshCw } from 'lucide-react';
+import Link from 'next/link';
+import { X, Heart, Star, ShoppingBag, Truck, RefreshCw, ArrowUpRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface QuickViewModalProps {
@@ -17,13 +18,13 @@ interface QuickViewModalProps {
 export default function QuickViewModal({ product, onClose }: QuickViewModalProps) {
   const [selectedColorIdx, setSelectedColorIdx] = useState(0);
   const [quantity, setQuantity] = useState(1);
-  const [mounted, setMounted] = useState(false);
+  const isClient = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
   const { addToCart } = useCart();
   const { toggleWishlist, isInWishlist } = useWishlist();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -36,7 +37,7 @@ export default function QuickViewModal({ product, onClose }: QuickViewModalProps
     }
   }, [product]);
 
-  if (!product || !mounted) return null;
+  if (!product || !isClient) return null;
 
   const currentColor = product.colors[selectedColorIdx] || product.colors[0];
   const isWished = isInWishlist(product.id);
@@ -112,9 +113,19 @@ export default function QuickViewModal({ product, onClose }: QuickViewModalProps
                 <h2 className="editorial-serif text-2xl sm:text-3xl font-medium text-[var(--theme-text)] mb-1">
                   {product.name}
                 </h2>
-                <p className="text-xs text-[var(--theme-accent)] font-medium mb-3">
-                  {product.subtitle}
-                </p>
+                <div className="flex items-center justify-between mb-3 gap-2">
+                  <p className="text-xs text-[var(--theme-accent)] font-medium">
+                    {product.subtitle}
+                  </p>
+                  <Link
+                    href={`/product/${product.slug || product.id}`}
+                    onClick={onClose}
+                    className="inline-flex items-center gap-1 text-[11px] font-medium text-stone-600 hover:text-black hover:underline shrink-0"
+                  >
+                    <span>Full Details</span>
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
 
                 {/* Price */}
                 <div className="flex items-baseline gap-2 mb-4 pb-4 border-b border-black/5">
@@ -263,6 +274,18 @@ export default function QuickViewModal({ product, onClose }: QuickViewModalProps
                     <RefreshCw className="w-3.5 h-3.5 text-stone-400 shrink-0" />
                     <span>14-Day Easy Exchange</span>
                   </div>
+                </div>
+
+                {/* Full Editorial PDP Link */}
+                <div className="mt-3.5 pt-3 border-t border-black/5 text-center">
+                  <Link
+                    href={`/product/${product.slug || product.id}`}
+                    onClick={onClose}
+                    className="inline-flex items-center justify-center gap-1.5 text-xs font-medium text-[var(--theme-text)] hover:text-[var(--theme-accent)] transition-colors group/link"
+                  >
+                    <span>View Dedicated Product Page &amp; Styling Guide</span>
+                    <ArrowUpRight className="w-3.5 h-3.5 transition-transform group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5" />
+                  </Link>
                 </div>
               </div>
             </div>

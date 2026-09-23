@@ -7,11 +7,11 @@ import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import SearchModal from './SearchModal';
 import WishlistDrawer from './WishlistDrawer';
-import { Search, Heart, ShoppingBag, Volume2, VolumeX, Menu, X, Sparkles } from 'lucide-react';
+import { Search, Heart, ShoppingBag, Volume2, VolumeX, Menu, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Navigation() {
-  const { currentTheme, isSoundEnabled, toggleSound } = useTheme();
+  const { isSoundEnabled, toggleSound } = useTheme();
   const { totalItems, setIsCartOpen } = useCart();
   const { wishlist, setIsWishlistOpen } = useWishlist();
 

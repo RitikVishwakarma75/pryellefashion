@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { Product } from '@/types';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
@@ -16,12 +17,12 @@ interface ProductCardProps {
 
 export default function ProductCard({ product, onQuickView, index = 0 }: ProductCardProps) {
   const [selectedColorIdx, setSelectedColorIdx] = useState(0);
-  const [isHovered, setIsHovered] = useState(false);
   const { addToCart } = useCart();
   const { toggleWishlist, isInWishlist } = useWishlist();
 
   const currentColor = product.colors[selectedColorIdx] || product.colors[0];
   const isWished = isInWishlist(product.id);
+  const productHref = `/product/${product.slug || product.id}`;
 
   return (
     <motion.div
@@ -29,20 +30,19 @@ export default function ProductCard({ product, onQuickView, index = 0 }: Product
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-50px' }}
       transition={{ duration: 0.6, delay: (index % 4) * 0.1 }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
       className="group relative flex flex-col justify-between rounded-2xl min-[360px]:rounded-3xl p-3 min-[360px]:p-3.5 sm:p-5 transition-all duration-500 glass-panel border border-white/60 hover:shadow-2xl hover:border-black/15 bg-white/70 gpu-layer w-full max-w-full overflow-hidden"
     >
       {/* Product Image Stage */}
-      <div className="relative w-full aspect-[4/5] rounded-xl min-[360px]:rounded-2xl overflow-hidden bg-gradient-to-b from-stone-100 to-stone-200/50 mb-3 sm:mb-4 cursor-pointer">
-        <Image
-          src={currentColor.image}
-          alt={`${product.name} - ${currentColor.name}`}
-          fill
-          sizes="(max-width: 480px) 100vw, (max-width: 1024px) 50vw, 25vw"
-          className="object-cover object-center transition-transform duration-700 ease-out group-hover:scale-108"
-          onClick={() => onQuickView(product)}
-        />
+      <div className="relative w-full aspect-[4/5] rounded-xl min-[360px]:rounded-2xl overflow-hidden bg-gradient-to-b from-stone-100 to-stone-200/50 mb-3 sm:mb-4">
+        <Link href={productHref} className="absolute inset-0 z-0">
+          <Image
+            src={currentColor.image}
+            alt={`${product.name} - ${currentColor.name}`}
+            fill
+            sizes="(max-width: 480px) 100vw, (max-width: 1024px) 50vw, 25vw"
+            className="object-cover object-center transition-transform duration-700 ease-out group-hover:scale-108"
+          />
+        </Link>
 
         {/* Ambient Hover Vignette */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
@@ -109,12 +109,11 @@ export default function ProductCard({ product, onQuickView, index = 0 }: Product
           </div>
 
           {/* Product Name & Subtitle */}
-          <h3
-            onClick={() => onQuickView(product)}
-            className="editorial-serif text-base min-[360px]:text-lg sm:text-xl font-normal text-[var(--theme-text)] cursor-pointer hover:text-[var(--theme-accent)] transition-colors leading-snug mb-1 line-clamp-1"
-          >
-            {product.name}
-          </h3>
+          <Link href={productHref} className="block group/title">
+            <h3 className="editorial-serif text-base min-[360px]:text-lg sm:text-xl font-normal text-[var(--theme-text)] cursor-pointer group-hover/title:text-[var(--theme-accent)] transition-colors leading-snug mb-1 line-clamp-1">
+              {product.name}
+            </h3>
+          </Link>
           <p className="text-[11px] min-[360px]:text-xs text-[var(--theme-text-muted)] line-clamp-2 leading-relaxed mb-3">
             {product.description}
           </p>

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, ArrowRight, Play, CheckCircle2, Scissors } from 'lucide-react';
+import { ArrowRight, Scissors } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { PRODUCTS } from '@/data/products';
 

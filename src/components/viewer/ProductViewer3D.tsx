@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { RotateCw, ZoomIn, ZoomOut, Sun, Sparkles, ShoppingBag } from 'lucide-react';
+import { RotateCw, ZoomIn, ZoomOut, Sparkles, ShoppingBag } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { PRODUCTS } from '@/data/products';
 
@@ -315,7 +315,6 @@ export default function ProductViewer3D() {
       if (e.touches.length === 1) {
         const touch = e.touches[0];
         const deltaX = touch.clientX - previousMousePositionRef.current.x;
-        const deltaY = touch.clientY - previousMousePositionRef.current.y;
 
         // Determine if user intent is horizontal rotation or vertical page scrolling
         if (touchIsHorizontalRef.current === null) {
@@ -420,6 +419,8 @@ export default function ProductViewer3D() {
       }
       renderer.dispose();
     };
+    // Scene is created once; material/lighting updates happen in later effects.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Handle Material / Color Change smoothly

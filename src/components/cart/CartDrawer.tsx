@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '@/context/CartContext';
 import { PRODUCTS } from '@/data/products';
 import Image from 'next/image';
-import { X, Trash2, ShoppingBag, ArrowRight, Sparkles, Tag, Truck } from 'lucide-react';
+import { X, Trash2, ShoppingBag, ArrowRight, Sparkles, Truck } from 'lucide-react';
 
 export default function CartDrawer() {
   const {

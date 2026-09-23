@@ -77,6 +77,9 @@ export interface Product {
   rating: number;
   reviewsCount: number;
   badge?: 'Bestseller' | 'Editorial Pick' | 'New Runway' | 'Limited Edition' | 'Bridal' | 'Travel Essential';
+  slug?: string;
+  stock?: number;
+  inStock?: boolean;
   is3DSupported?: boolean;
   threeDType?: 'claw' | 'pin' | 'comb' | 'scrunchie';
 }
@@ -125,6 +128,16 @@ export interface CartItem {
   product: Product;
   selectedColor: ProductColor;
   quantity: number;
+}
+
+export interface ShippingDetails {
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  pincode: string;
+  paymentMethod?: string;
 }
 
 export interface CustomerReview {

@@ -1,6 +1,13 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  ReactNode,
+} from 'react';
 import { Product } from '@/types';
 
 interface WishlistContextType {
@@ -13,38 +20,61 @@ interface WishlistContextType {
 
 const WishlistContext = createContext<WishlistContextType | undefined>(undefined);
 
+const WISHLIST_STORAGE_KEY = 'prayele_wishlist';
+const WISHLIST_EVENT = 'prayele-wishlist-change';
+
+function subscribeToWishlist(onStoreChange: () => void) {
+  window.addEventListener('storage', onStoreChange);
+  window.addEventListener(WISHLIST_EVENT, onStoreChange);
+  return () => {
+    window.removeEventListener('storage', onStoreChange);
+    window.removeEventListener(WISHLIST_EVENT, onStoreChange);
+  };
+}
+
+function getWishlistSnapshot() {
+  try {
+    return localStorage.getItem(WISHLIST_STORAGE_KEY) ?? '[]';
+  } catch {
+    return '[]';
+  }
+}
+
+function getServerWishlistSnapshot() {
+  return '[]';
+}
+
+function writeWishlist(next: Product[]) {
+  try {
+    localStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    console.warn('Failed to save wishlist');
+  }
+  window.dispatchEvent(new Event(WISHLIST_EVENT));
+}
+
 export function WishlistProvider({ children }: { children: ReactNode }) {
-  const [wishlist, setWishlist] = useState<Product[]>([]);
+  const wishlistJson = useSyncExternalStore(
+    subscribeToWishlist,
+    getWishlistSnapshot,
+    getServerWishlistSnapshot
+  );
+  const wishlist = useMemo<Product[]>(() => {
+    try {
+      const parsed = JSON.parse(wishlistJson);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }, [wishlistJson]);
+
   const [isWishlistOpen, setIsWishlistOpen] = useState(false);
 
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('prayele_wishlist');
-      if (saved) {
-        setWishlist(JSON.parse(saved));
-      }
-    } catch (e) {
-      console.warn('Failed to load wishlist');
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('prayele_wishlist', JSON.stringify(wishlist));
-    } catch (e) {
-      console.warn('Failed to save wishlist');
-    }
-  }, [wishlist]);
-
   const toggleWishlist = (product: Product) => {
-    setWishlist((prev) => {
-      const exists = prev.some((p) => p.id === product.id);
-      if (exists) {
-        return prev.filter((p) => p.id !== product.id);
-      } else {
-        return [...prev, product];
-      }
-    });
+    const exists = wishlist.some((p) => p.id === product.id);
+    writeWishlist(
+      exists ? wishlist.filter((p) => p.id !== product.id) : [...wishlist, product]
+    );
   };
 
   const isInWishlist = (productId: string) => {
