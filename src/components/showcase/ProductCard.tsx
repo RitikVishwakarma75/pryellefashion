@@ -11,7 +11,7 @@ import { motion } from 'framer-motion';
 
 interface ProductCardProps {
   product: Product;
-  onQuickView: (product: Product) => void;
+  onQuickView?: (product: Product) => void;
   index?: number;
 }
 
@@ -80,7 +80,7 @@ export default function ProductCard({ product, onQuickView, index = 0 }: Product
         {/* Quick View Hover/Touch Pill */}
         <div className="absolute inset-x-2 min-[360px]:inset-x-2.5 sm:inset-x-4 bottom-2 min-[360px]:bottom-2.5 sm:bottom-4 z-10 flex gap-2 opacity-95 md:opacity-0 md:translate-y-4 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
           <button
-            onClick={() => onQuickView(product)}
+            onClick={() => onQuickView?.(product)}
             className="flex-1 py-1.5 sm:py-2.5 rounded-xl bg-white/95 backdrop-blur-md text-[var(--theme-text)] text-[9.5px] min-[360px]:text-[10px] sm:text-xs font-medium tracking-wider uppercase shadow-lg hover:bg-white active:scale-95 flex items-center justify-center gap-1 sm:gap-1.5 transition-colors"
           >
             <Eye className="w-3 h-3 sm:w-3.5 sm:h-3.5" />

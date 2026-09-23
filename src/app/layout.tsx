@@ -4,6 +4,7 @@ import './globals.css';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { CartProvider } from '@/context/CartContext';
 import { WishlistProvider } from '@/context/WishlistContext';
+import { AuthProvider } from '@/context/AuthContext';
 import Navigation from '@/components/layout/Navigation';
 import Footer from '@/components/layout/Footer';
 import CartDrawer from '@/components/cart/CartDrawer';
@@ -61,6 +62,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${cormorant.variable} ${jakarta.variable} scroll-smooth`}>
       <body className="min-h-screen flex flex-col font-sans selection:bg-[var(--theme-accent)] selection:text-black pb-16 md:pb-0">
+        <AuthProvider>
         <ThemeProvider>
           <CartProvider>
             <WishlistProvider>
@@ -84,6 +86,7 @@ export default function RootLayout({
             </WishlistProvider>
           </CartProvider>
         </ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
   );
